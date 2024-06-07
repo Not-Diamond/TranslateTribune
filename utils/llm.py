@@ -130,7 +130,7 @@ def find_json(text):
         return []
 
 
-def route_llm_prompt(text_chunk, instructions, source_langage, target_language):
+def route_llm_prompt(text_chunk, instructions, llm_providers, source_langage, target_language):
     """
     Route the given prompt to the appropriate LLM model using Not Diamond.
     """
@@ -144,7 +144,8 @@ def route_llm_prompt(text_chunk, instructions, source_langage, target_language):
     body = {
         "source_language": source_langage,
         "target_language": target_language,
-        "prompt": [{"role": "system", "content": instructions}, {"role": "user", "content": text_chunk}]
+        "messages": [{"role": "system", "content": instructions}, {"role": "user", "content": text_chunk}],
+        "llm_providers": llm_providers
     }
     response = requests.post(
         nd_url,
@@ -247,8 +248,10 @@ def send_to_mistral(text_chunk, instructions, model_id="mistral-large-latest"):
 
 
 def fetch_llm_response(text, instructions, model, validation=None, language_filter=None, min_article_score=None,source_langage=None, target_language=None):
+    # todo [a9] models to consider
+    llm_providers = []
 
-    routed_model = route_llm_prompt(text, instructions, source_langage, target_language)
+    routed_model = route_llm_prompt(text, instructions, llm_providers, source_langage, target_language)
 
     if routed_model == "gemini-1.0-pro-latest":
         chunks = text_to_chunks(text,chunk_size=(31000-len(instructions)))
