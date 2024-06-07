@@ -257,6 +257,7 @@ def fetch_llm_response(text, instructions, model, validation=None, language_filt
 
     nd_routed_model = route_llm_prompt(text, instructions, llm_providers, source_langage, target_language)
 
+    nd_routing = False
     if nd_routed_model in ["gemini-1.5-flash-latest", "gemini-1.5-pro-latest"]:
         chunks = text_to_chunks(text,chunk_size=(31000-len(instructions)))
         # Google Gemini can occasionally return empty responses - handle this with retries and,
@@ -266,14 +267,20 @@ def fetch_llm_response(text, instructions, model, validation=None, language_filt
         except RuntimeError as e:
             logging.error(f"Error sending task to {nd_routed_model}. Falling back to {model}. {e}")
             response = fetch_llm_response_fallback(text, instructions, model, nd_routed_model)
+        nd_routing = True
     elif nd_routed_model == "claude-3-haiku-20240307":
         chunks = text_to_chunks(text,chunk_size=(190000-len(instructions)))
         response = send_to_anthropic(chunks[0], instructions,'claude-3-haiku-20240307')
+        nd_routing = True
     elif nd_routed_model == "gpt-4o-2024-05-13":
         chunks = text_to_chunks(text,chunk_size=(31000-len(instructions)))
         response = send_to_openai(chunks[0],instructions,'gpt-4o-2024-05-13')
+        nd_routing = True
     else:
         response = fetch_llm_response_fallback(text, instructions, model, nd_routed_model)
+
+    if nd_routing:
+        model = nd_routed_model
 
     if validation is None:
         return response, model
