@@ -154,7 +154,11 @@ def route_llm_prompt(text_chunk, instructions, llm_providers, source_langage, ta
             "content-type": "application/json",
         },
     )
-    selected_model = response.json().get("provider").get("model")
+    logging.info(f"ND body={body}, response={response}")
+    if "provider" not in response.json():
+        selected_model = None
+    else:
+        selected_model = response.json().get("provider").get("model")
     logging.info(f"ND routing to {selected_model} for {source_langage} to {target_language} translation.")
     return selected_model
 
