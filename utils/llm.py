@@ -134,7 +134,7 @@ def route_llm_prompt(text_chunk, instructions, llm_providers, source_langage, ta
     """
     Route the given prompt to the appropriate LLM model using Not Diamond.
     """
-    nd_url = "https://not-diamond-server.onrender.com"
+    nd_url = "https://not-diamond-server.onrender.com/v2/TT/translate"
     nd_api_key = os.getenv("ND_API_KEY")
     if not nd_api_key:
         logging.warning("ND_API_KEY not set. Skipping routing.")
@@ -248,24 +248,21 @@ def send_to_mistral(text_chunk, instructions, model_id="mistral-large-latest"):
 
 def fetch_llm_response(text, instructions, model, validation=None, language_filter=None, min_article_score=None,source_langage=None, target_language=None):
     llm_providers = [
-        {"provider": "anthropic", "model": "claude-3-opus-20240229"},
-        {"provider": "anthropic", "model": "claude-3-sonnet-20240229"},
         {"provider": "anthropic", "model": "claude-3-haiku-20240307"},
-        {"provider": "google", "model": "gemini-1.5-pro-latest"},
         {"provider": "google", "model": "gemini-1.5-flash-latest"},
-        {"provider": "google", "model": "gemini-1.0-pro-latest"},
-        {"provider": "mistral", "model": "mistral-large-latest"},
-        {"provider": "openai", "model": "gpt-4o-2024-05-13"},
+        # More expensive model options
+        # {"provider": "google", "model": "gemini-1.5-pro-latest"},
+        # {"provider": "openai", "model": "gpt-4o-2024-05-13"},
     ]
 
     routed_model = route_llm_prompt(text, instructions, llm_providers, source_langage, target_language)
 
-    if routed_model == "gemini-1.0-pro-latest":
+    if routed_model == "gemini-1.5-flash-latest":
         chunks = text_to_chunks(text,chunk_size=(31000-len(instructions)))
         response = send_to_gemini(chunks[0], instructions, model_id=routed_model)
-    elif routed_model == "mistral-small-latest":
-        chunks = text_to_chunks(text,chunk_size=(31000-len(instructions)))
-        response = send_to_mistral(chunks[0], instructions, model_id=routed_model)
+    elif routed_model == "claude-3-haiku-20240307":
+        chunks = text_to_chunks(text,chunk_size=(190000-len(instructions)))
+        response = send_to_anthropic(chunks[0], instructions,'claude-3-haiku-20240307')
     else:
         if model == "Claude 3h":
             chunks = text_to_chunks(text,chunk_size=(190000-len(instructions)))
