@@ -150,8 +150,8 @@ def publish(sources_config, lang_config, finder_template, \
                 finder_template.render(**locals()),\
                 source_config["finder_model"],\
                 "url",
-                source_config['source_language'],
-                lang_config['publishing_language'])
+                source_langage=source_config['source_language'],
+                target_language=lang_config['publishing_language'])
             logging.info(best_links)
             link = best_links[0]
 
@@ -170,8 +170,8 @@ def publish(sources_config, lang_config, finder_template, \
                     "html-article",\
                     lang_config["publishing_language_short"],\
                     3,
-                    source_config['source_language'],
-                    lang_config['publishing_language']
+                    source_langage=source_config['source_language'],
+                    target_language=lang_config['publishing_language']
                 )
 
             article_title, article_summary, front_page_score, article_id = add_required_html(\
