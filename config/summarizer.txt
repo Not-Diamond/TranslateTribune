@@ -23,7 +23,6 @@ Assign a "data-front-page-score" of 2 if the article covers any of the following
 
 Assign a "data-front-page-score" of 1 if the article is any of the following:
 - News items not relevant to an international audience
-– News that is not of national significance to {{ source_config["source_country"] }}
 - Local, city, or regional news
 – Local or city social, political, or economic developments
 – Consumer-focused deals, reviews, or tips
