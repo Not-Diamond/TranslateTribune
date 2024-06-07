@@ -134,8 +134,7 @@ def route_llm_prompt(text_chunk, instructions, llm_providers, source_langage, ta
     """
     Route the given prompt to the appropriate LLM model using Not Diamond.
     """
-    # todo [a9]
-    nd_url = None
+    nd_url = "https://not-diamond-server.onrender.com"
     nd_api_key = os.getenv("ND_API_KEY")
     if not nd_api_key:
         logging.warning("ND_API_KEY not set. Skipping routing.")
@@ -155,7 +154,7 @@ def route_llm_prompt(text_chunk, instructions, llm_providers, source_langage, ta
             "content-type": "application/json",
         },
     )
-    selected_model = response.json().get("model")
+    selected_model = response.json().get("provider").get("model")
     logging.info(f"ND routing to {selected_model} for {source_langage} to {target_language} translation.")
     return selected_model
 
@@ -248,8 +247,16 @@ def send_to_mistral(text_chunk, instructions, model_id="mistral-large-latest"):
 
 
 def fetch_llm_response(text, instructions, model, validation=None, language_filter=None, min_article_score=None,source_langage=None, target_language=None):
-    # todo [a9] models to consider
-    llm_providers = []
+    llm_providers = [
+        {"provider": "anthropic", "model": "claude-3-opus-20240229"},
+        {"provider": "anthropic", "model": "claude-3-sonnet-20240229"},
+        {"provider": "anthropic", "model": "claude-3-haiku-20240307"},
+        {"provider": "google", "model": "gemini-1.5-pro-latest"},
+        {"provider": "google", "model": "gemini-1.5-flash-latest"},
+        {"provider": "google", "model": "gemini-1.0-pro-latest"},
+        {"provider": "mistral", "model": "mistral-large-latest"},
+        {"provider": "openai", "model": "gpt-4o-2024-05-13"},
+    ]
 
     routed_model = route_llm_prompt(text, instructions, llm_providers, source_langage, target_language)
 
