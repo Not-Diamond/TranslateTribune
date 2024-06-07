@@ -264,10 +264,10 @@ def fetch_llm_response(text, instructions, model, validation=None, language_filt
         # if necessary, fallback to the configured default model
         try:
             response = send_to_gemini(chunks[0], instructions, model_id=nd_routed_model)
+            nd_routing = True
         except RuntimeError as e:
             logging.error(f"Error sending task to {nd_routed_model}. Falling back to {model}. {e}")
             response = fetch_llm_response_fallback(text, instructions, model, nd_routed_model)
-        nd_routing = True
     elif nd_routed_model == "claude-3-haiku-20240307":
         chunks = text_to_chunks(text,chunk_size=(190000-len(instructions)))
         response = send_to_anthropic(chunks[0], instructions,'claude-3-haiku-20240307')
