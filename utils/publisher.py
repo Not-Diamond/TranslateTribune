@@ -34,7 +34,7 @@ from templater import deploy_website
 def add_required_html(article_summary, article_url, finder_model, summarizer_model, source_config, lang_config):
         # Add HTML comment with model information for debugging
         article_summary = f"""<!-- Finder Model:     {finder_model} -->\n
-                              <!-- Summarizer Model: {summarizer_model} -->  
+                              <!-- Summarizer Model: {summarizer_model} -->
                               {article_summary}"""
 
         # Save the title
@@ -42,7 +42,7 @@ def add_required_html(article_summary, article_url, finder_model, summarizer_mod
         article_div = soup.find('div', class_='article')
         title_div = soup.find('div', class_='article-title')
         article_title=title_div.text.strip()
-    
+
 
         if article_div:
             if lang_config.get("is_rtl", False):
@@ -61,7 +61,7 @@ def add_required_html(article_summary, article_url, finder_model, summarizer_mod
             article_header_div.append(source_country_span)
             article_div.insert(0, article_header_div)
             article_div['onclick'] = 'toggleArticleDetails(this)'
-       
+
         if title_div:
             article_id = str(uuid.uuid4())
             title_div['id'] = article_id
@@ -89,24 +89,24 @@ def add_required_html(article_summary, article_url, finder_model, summarizer_mod
                             />
                         </svg>
                     '''
-            bg_div=soup.new_tag('div', attrs={"class": "rotated-background-btn"})        
+            bg_div=soup.new_tag('div', attrs={"class": "rotated-background-btn"})
             wrapper_div.append(source_name_span)
             wrapper_div.append(BeautifulSoup(svg_html, 'html.parser'))
             wrapper_div.append(bg_div)
-            
+
             link.append(wrapper_div)
 
             content_div.append(' ')
-            content_div.append(link)             
-                            
+            content_div.append(link)
+
         article_summary = str(soup)
 
         # Get the front page score
         article = soup.find('div', class_='article')
         front_page_score = float(article['data-front-page-score'])
 
-        return article_title, article_summary, front_page_score, article_id 
- 
+        return article_title, article_summary, front_page_score, article_id
+
 
 def simplify_html(html):
     allowed_tags = ['div', 'span', 'p', 'a']
@@ -118,7 +118,7 @@ def simplify_html(html):
 
 
 def publish(sources_config, lang_config, finder_template, \
-        summarizer_template, html_filename, rss_filename, section_key, persona_type="persona"):        
+        summarizer_template, html_filename, rss_filename, section_key, persona_type="persona"):
 
     random.shuffle(sources_config)
 
@@ -142,14 +142,17 @@ def publish(sources_config, lang_config, finder_template, \
             except KeyError:
                 all_links = fetch_content(source_config["source_url"],\
                         "links",\
-                        source_config["source_language"]) 
+                        source_config["source_language"])
                 link_cache[source_config["source_url"]] = all_links
 
             best_links, finder_model = fetch_llm_response(
                 all_links,\
                 finder_template.render(**locals()),\
                 source_config["finder_model"],\
-                "url")
+                "url",\
+                source_language=source_config["source_language"],\
+                target_language=lang_config["publishing_language"],\
+            )
             logging.info(best_links)
             link = best_links[0]
 
@@ -168,7 +171,7 @@ def publish(sources_config, lang_config, finder_template, \
                     "html-article",\
                     lang_config["publishing_language_short"],\
                     3)
-            
+
             article_title, article_summary, front_page_score, article_id = add_required_html(\
                                                                 article_summary,\
                                                                 link,\
@@ -176,18 +179,18 @@ def publish(sources_config, lang_config, finder_template, \
                                                                 summarizer_model,\
                                                                 source_config,\
                                                                 lang_config)
-            
+
             article_dict[article_title] = {}
             article_dict[article_title]["html"] = article_summary
             article_dict[article_title]["score"] = front_page_score
             article_dict[article_title]["id"] = article_id
             source_countries_published.append(source_config["source_country"])
             logging.info(article_summary)
-            
+
         except Exception as e:
             logging.exception(f"An unexpected error occurred, ignoring: {e}")
             traceback.print_exc()
-    
+
     sorted_articles = sorted(article_dict.items(), key=lambda x: x[1]['score'], reverse=True)
     article_html=""
     article_rss=""
@@ -203,7 +206,7 @@ def publish(sources_config, lang_config, finder_template, \
                               <guid isPermaLink="false">https://translatetribune.com/{html_filename}#{article_data['id']}</guid>
                               <description>
                                 <![CDATA[
-                                  {simplify_html(article_data['html'])}    
+                                  {simplify_html(article_data['html'])}
                                 ]]>
                               </description>
                               <pubDate>{datetime.datetime.now().strftime("%a, %d %b %Y %H:%M:%S +0000")}</pubDate>
@@ -224,7 +227,7 @@ def load_template(file_path):
 def get_language_config(language):
     with open('config/languages.json', 'r') as file:
         lang_configs = json.load(file)
-    
+
     for item in lang_configs:
         if item.get("publishing_language") == language:
             return item
@@ -239,13 +242,13 @@ def get_sources_config(filename):
 
 def deploy_language(publishing_language):
     lang_config = get_language_config(publishing_language)
-    
+
     finder_template = load_template('config/finder.txt')
     summarizer_template = load_template('config/summarizer.txt')
-    
+
     debug = os.environ.get('DEBUG', False)
     sources_filename = 'config/sources_debug.json' if debug else 'config/sources.json'
-    
+
     publish(get_sources_config(sources_filename),\
             lang_config,\
             finder_template,\
@@ -261,7 +264,7 @@ def deploy_language(publishing_language):
         if os.path.exists(assets_destination_folder):
             shutil.rmtree(assets_destination_folder)
         shutil.copytree(assets_source_folder, assets_destination_folder)
-        
+
 
     # Create the finance and technology page
     if not debug:
@@ -276,13 +279,13 @@ def deploy_language(publishing_language):
 
 if __name__ == "__main__":
     debug = os.environ.get('DEBUG', False)
-    
+
     if debug:
         deploy_language("Arabic")
         deploy_language("English")
     else:
         with open('config/languages.json', 'r') as file:
             lang_configs = json.load(file)
-        
+
         for lang_config in lang_configs:
             deploy_language(lang_config["publishing_language"])

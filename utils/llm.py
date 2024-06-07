@@ -2,8 +2,9 @@ import os
 import re
 import json
 import logging
-import random
+import time
 
+import requests
 import validators
 
 import anthropic
@@ -12,6 +13,8 @@ import openai
 
 from mistralai.client import MistralClient
 from mistralai.models.chat_completion import ChatMessage
+
+import google.generativeai as genai
 
 from urlextract import URLExtract
 from bs4 import BeautifulSoup
@@ -124,7 +127,67 @@ def find_json(text):
         except Exception:
             return []
     else:
-        return [] 
+        return []
+
+
+def route_llm_prompt(text_chunk, instructions, source_langage, target_language):
+    """
+    Route the given prompt to the appropriate LLM model using Not Diamond.
+    """
+    # todo [a9]
+    nd_url = None
+    nd_api_key = os.getenv("ND_API_KEY")
+    if not nd_api_key:
+        logging.warning("ND_API_KEY not set. Skipping routing.")
+        return None
+
+    body = {
+        "source_language": source_langage,
+        "target_language": target_language,
+        "prompt": [{"role": "system", "content": instructions}, {"role": "user", "content": text_chunk}]
+    }
+    response = requests.post(
+        nd_url,
+        json=body,
+        headers={
+            "Authorization": f"Bearer {nd_api_key}",
+            "content-type": "application/json",
+        },
+    )
+    selected_model = response.json().get("model")
+    logging.info(f"ND routing to {selected_model} for {source_langage} to {target_language} translation.")
+    return selected_model
+
+
+def send_to_gemini(text_chunk, instructions, n_retries: int=3, retry_wait: float=2.0, model_id="gemini-1.0-pro-latest"):
+    """
+    Send a prompt to the specified model at Gemini. Retry up to n_retries times if the response is empty.
+    """
+    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+    gemini = genai.GenerativeModel(f"models/{model_id}")
+
+    messages = [
+        {"role": "user", "parts": instructions},
+        {"role": "user", "parts": text_chunk}
+    ]
+
+    retries = 0
+    while retries < n_retries:
+        response = gemini.generate_content(
+            messages,
+            generation_config=genai.types.GenerationConfig(temperature=0.),
+        )
+        response_text = "\n".join(part.text for part in response.candidates[0].content.parts)
+
+        if response_text:
+            break
+        else:
+            retries += 1
+            time.sleep(retry_wait)
+
+    if response_text:
+        return response_text
+    raise RuntimeError(f"Failed to generate content from {model_id} after {n_retries} retries.")
 
 
 def send_to_anthropic(text_chunk, instructions, model_id="claude-3-opus-20240229"):
@@ -146,7 +209,7 @@ def send_to_anthropic(text_chunk, instructions, model_id="claude-3-opus-20240229
             }
         ]
     )
-    
+
     return message.content[0].text
 
 
@@ -183,20 +246,29 @@ def send_to_mistral(text_chunk, instructions, model_id="mistral-large-latest"):
     return chat_completion.choices[0].message.content
 
 
-def fetch_llm_response(text, instructions, model, validation=None, language_filter=None, min_article_score=None):
+def fetch_llm_response(text, instructions, model, validation=None, language_filter=None, min_article_score=None,source_langage=None, target_language=None):
 
-    if model == "Claude 3h":
-        chunks = text_to_chunks(text,chunk_size=(190000-len(instructions)))
-        response = send_to_anthropic(chunks[0], instructions,'claude-3-haiku-20240307')
-    elif model == "GPT-4o":
+    routed_model = route_llm_prompt(text, instructions, source_langage, target_language)
+
+    if routed_model == "gemini-1.0-pro-latest":
         chunks = text_to_chunks(text,chunk_size=(31000-len(instructions)))
-        response = send_to_openai(chunks[0],instructions,'gpt-4o')
-    elif model == "Open Mixtral":
+        response = send_to_gemini(chunks[0], instructions, model_id=routed_model)
+    elif routed_model == "mistral-small-latest":
         chunks = text_to_chunks(text,chunk_size=(31000-len(instructions)))
-        response = send_to_mistral(chunks[0], instructions,'open-mixtral-8x7b')
+        response = send_to_mistral(chunks[0], instructions, model_id=routed_model)
     else:
-        raise UnsupportedModelException(model)
-        
+        if model == "Claude 3h":
+            chunks = text_to_chunks(text,chunk_size=(190000-len(instructions)))
+            response = send_to_anthropic(chunks[0], instructions,'claude-3-haiku-20240307')
+        elif model == "GPT-4o":
+            chunks = text_to_chunks(text,chunk_size=(31000-len(instructions)))
+            response = send_to_openai(chunks[0],instructions,'gpt-4o')
+        elif model == "Open Mixtral":
+            chunks = text_to_chunks(text,chunk_size=(31000-len(instructions)))
+            response = send_to_mistral(chunks[0], instructions,'open-mixtral-8x7b')
+        else:
+            raise UnsupportedModelException(f"Provided model={model}, ND routed model={routed_model}")
+
     if validation is None:
         return response, model
     elif validation == "url":
