@@ -266,7 +266,7 @@ def fetch_llm_response(text, instructions, model, validation=None, language_filt
 
     nd_routing = False
     if nd_routed_model in ["gemini-1.5-flash-latest", "gemini-1.5-pro-latest"]:
-        chunks = text_to_chunks(text,chunk_size=(190000-len(instructions)))
+        chunks = text_to_chunks(text,chunk_size=(31000-len(instructions)))
         # Google Gemini can occasionally return empty responses - handle this with retries and,
         # if necessary, fallback to the configured default model
         try:
