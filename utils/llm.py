@@ -290,9 +290,13 @@ def fetch_llm_response(text, instructions, model, validation=None, language_filt
     if validation == 'html-article':
         soup = BeautifulSoup(response, 'html.parser')
         article_summary = find_article_content(soup, min_article_score)
-        summary_length = len(' '.split(article_summary.text.strip()))
+        summary_length = len(article_summary.text.strip().split(' '))
 
-    if not nd_routing or (validation == 'html-article' and (summary_length > 150 or summary_length < 50)):
+    if not nd_routing or (validation == 'html-article' and (summary_length > 250 or summary_length < 50)):
+        log_msg = f"Falling back to {model}."
+        if validation == 'html-article':
+            log_msg = f"Article summary length: {summary_length} " + log_msg
+        logging.info(log_msg)
         response = fetch_llm_response_fallback(text, instructions, model, nd_routed_model)
         nd_routing = False
 
